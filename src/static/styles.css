@@ -57,6 +57,32 @@ section h3 {
   color: #1a237e;
 }
 
+.activity-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.activity-filters label {
+  display: grid;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.activity-filters input,
+.activity-filters select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+  font-size: 16px;
+  font-weight: normal;
+}
+
 .activity-card {
   margin-bottom: 15px;
   padding: 15px;
