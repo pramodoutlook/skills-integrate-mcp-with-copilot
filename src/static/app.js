@@ -1,30 +1,73 @@
 document.addEventListener("DOMContentLoaded", () => {
   const activitiesList = document.getElementById("activities-list");
   const activitySelect = document.getElementById("activity");
+  const searchInput = document.getElementById("activity-search");
+  const categoryFilter = document.getElementById("category-filter");
+  const sortSelect = document.getElementById("activity-sort");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  let activities = {};
 
-  // Function to fetch activities from API
-  async function fetchActivities() {
-    try {
-      const response = await fetch("/activities");
-      const activities = await response.json();
+  function populateControls() {
+    const selectedCategory = categoryFilter.value;
+    const categories = [...new Set(
+      Object.values(activities).map((activity) => activity.category)
+    )].sort((first, second) => first.localeCompare(second));
 
-      // Clear loading message
-      activitiesList.innerHTML = "";
+    categoryFilter.innerHTML = '<option value="">All categories</option>';
+    categories.forEach((category) => {
+      const option = document.createElement("option");
+      option.value = category;
+      option.textContent = category;
+      categoryFilter.appendChild(option);
+    });
+    categoryFilter.value = categories.includes(selectedCategory) ? selectedCategory : "";
 
-      // Populate activities list
-      Object.entries(activities).forEach(([name, details]) => {
-        const activityCard = document.createElement("div");
-        activityCard.className = "activity-card";
+    activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
+    Object.keys(activities).forEach((name) => {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      activitySelect.appendChild(option);
+    });
+  }
 
-        const spotsLeft =
-          details.max_participants - details.participants.length;
+  function renderActivities() {
+    const searchTerm = searchInput.value.trim().toLocaleLowerCase();
+    const selectedCategory = categoryFilter.value;
+    const sortBy = sortSelect.value;
+    const filteredActivities = Object.entries(activities).filter(([name, details]) => {
+      const matchesCategory = !selectedCategory || details.category === selectedCategory;
+      const searchableText = [name, details.category, details.description, details.schedule]
+        .join(" ")
+        .toLocaleLowerCase();
+      return matchesCategory && searchableText.includes(searchTerm);
+    });
 
-        // Create participants HTML with delete icons instead of bullet points
-        const participantsHTML =
-          details.participants.length > 0
-            ? `<div class="participants-section">
+    filteredActivities.sort(([firstName, firstDetails], [secondName, secondDetails]) => {
+      if (sortBy === "time") {
+        const timeOrder = firstDetails.start_time.localeCompare(secondDetails.start_time);
+        if (timeOrder !== 0) {
+          return timeOrder;
+        }
+      }
+      return firstName.localeCompare(secondName);
+    });
+
+    activitiesList.innerHTML = "";
+    if (filteredActivities.length === 0) {
+      activitiesList.innerHTML = "<p>No activities match your filters.</p>";
+      return;
+    }
+
+    filteredActivities.forEach(([name, details]) => {
+      const activityCard = document.createElement("div");
+      activityCard.className = "activity-card";
+
+      const spotsLeft = details.max_participants - details.participants.length;
+      const participantsHTML =
+        details.participants.length > 0
+          ? `<div class="participants-section">
               <h5>Participants:</h5>
               <ul class="participants-list">
                 ${details.participants
@@ -35,31 +78,32 @@ document.addEventListener("DOMContentLoaded", () => {
                   .join("")}
               </ul>
             </div>`
-            : `<p><em>No participants yet</em></p>`;
+          : "<p><em>No participants yet</em></p>";
 
-        activityCard.innerHTML = `
-          <h4>${name}</h4>
-          <p>${details.description}</p>
-          <p><strong>Schedule:</strong> ${details.schedule}</p>
-          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
-          <div class="participants-container">
-            ${participantsHTML}
-          </div>
-        `;
+      activityCard.innerHTML = `
+        <h4>${name}</h4>
+        <p><strong>Category:</strong> ${details.category}</p>
+        <p>${details.description}</p>
+        <p><strong>Schedule:</strong> ${details.schedule}</p>
+        <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+        <div class="participants-container">
+          ${participantsHTML}
+        </div>
+      `;
 
-        activitiesList.appendChild(activityCard);
+      activitiesList.appendChild(activityCard);
+    });
+  }
 
-        // Add option to select dropdown
-        const option = document.createElement("option");
-        option.value = name;
-        option.textContent = name;
-        activitySelect.appendChild(option);
-      });
-
-      // Add event listeners to delete buttons
-      document.querySelectorAll(".delete-btn").forEach((button) => {
-        button.addEventListener("click", handleUnregister);
-      });
+  async function fetchActivities() {
+    try {
+      const response = await fetch("/activities");
+      if (!response.ok) {
+        throw new Error("Failed to fetch activities");
+      }
+      activities = await response.json();
+      populateControls();
+      renderActivities();
     } catch (error) {
       activitiesList.innerHTML =
         "<p>Failed to load activities. Please try again later.</p>";
@@ -67,9 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Handle unregister functionality
-  async function handleUnregister(event) {
-    const button = event.target;
+  async function handleUnregister(button) {
     const activity = button.getAttribute("data-activity");
     const email = button.getAttribute("data-email");
 
@@ -109,6 +151,17 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error unregistering:", error);
     }
   }
+
+  activitiesList.addEventListener("click", (event) => {
+    const button = event.target.closest(".delete-btn");
+    if (button) {
+      handleUnregister(button);
+    }
+  });
+
+  searchInput.addEventListener("input", renderActivities);
+  categoryFilter.addEventListener("change", renderActivities);
+  sortSelect.addEventListener("change", renderActivities);
 
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
